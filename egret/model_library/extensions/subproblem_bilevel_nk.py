@@ -16,6 +16,7 @@ import egret.model_library.decl as decl
 import pyomo.environ as pe
 import pyomo.gdp as gdp
 import math
+import pdb
 
 def disjunctify(model, indicator_name, disjunct_name, LHS_disjunct_set, RHS_disjunct_set):
     assert len(LHS_disjunct_set) == len(RHS_disjunct_set)
@@ -226,10 +227,8 @@ def declare_eq_branch_power_btheta_approx_nonlin(model, index_set, branches):
 
         x = branch['reactance']
         b = -1/(tau*x)
-
         m.eq_pf_branch_ub[branch_name] = m.pf[branch_name] == \
             b * (m.va[from_bus] - m.va[to_bus] + shift) * m.w[branch_name]
-
 
 def declare_ineq_load_shed(model, index_set):
     """
@@ -284,6 +283,5 @@ def declare_ineq_gen(model, index_set, gens):
         m.ineq_gen_ub[gen_name] = \
             m.pg[gen_name] <= m.v[gen_name]*gen['p_max']
         m.ineq_gen_lb[gen_name] = \
-            m.v[gen_name]*0. <= m.pg[gen_name] # assumes LB is zero generation
-            #m.v[gen_name] * gen['p_min'] <= m.pg[gen_name] # TODO: implementation of feasible bilevel for when p_min > 0.
+            m.v[gen_name] * gen['p_min'] <= m.pg[gen_name] # TODO: implementation of feasible bilevel for when p_min > 0.
 
