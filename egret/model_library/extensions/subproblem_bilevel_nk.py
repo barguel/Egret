@@ -212,7 +212,7 @@ def declare_eq_branch_power_btheta_approx_nonlin(model, index_set, branches):
     con_set = decl.declare_set("_con_eq_branch_power_btheta_approx_bigM_set", model, index_set)
 
     m.eq_pf_branch_ub = pe.Constraint(con_set)
-    m.eq_pf_branch_lb = pe.Constraint(con_set)
+    #m.eq_pf_branch_lb = pe.Constraint(con_set)
     for branch_name in con_set:
         branch = branches[branch_name]
 

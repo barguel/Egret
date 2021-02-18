@@ -181,7 +181,6 @@ def create_explicit_subproblem(model, subproblem, model_data, include_angle_diff
     subproblem.add_component("u", Reference(model.u))
     subproblem.add_component("v", Reference(model.v))
     subproblem.add_component("w", Reference(model.w))
-
     if include_bigm:
         # create big-M
         _create_bigm(subproblem, md)
@@ -213,7 +212,6 @@ def create_explicit_subproblem(model, subproblem, model_data, include_angle_diff
                                                      p_thermal_limits=p_max,
                                                      approximation_type=ApproximationType.BTHETA
                                                      )
-
 
     ### declare the load shed
     subcons.declare_ineq_load_shed(model=subproblem,

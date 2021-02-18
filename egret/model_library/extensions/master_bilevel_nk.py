@@ -24,6 +24,16 @@ def declare_budget(model, k, relays):
 
     m.budget = pe.Constraint(expr=sum(m.delta[r] for r in relays) <= k)
 
+def declare_physical_budget(model, k):
+    """
+    Create the budget constraint for physical attacks
+    """
+
+    m = model
+    m.budget = pe.Constraint(expr=sum(1*m.delta_gen[g] for g in m.delta_gen.index_set()) +\
+        sum(1*m.delta_branch[k] for k in m.delta_branch.index_set()) +\
+        sum(1*m.delta_load[b] for b in m.delta_load.index_set()) +\
+        sum(1*m.delta_bus[b] for b in m.delta_bus.index_set()) <= k)
 
 def declare_load_compromised(model, index_set):
 
@@ -89,3 +99,64 @@ def declare_gen_uncompromised(model, index_set, gen_relays):
 
     for g in con_set:
         m.gen_uncompromised[g] = sum((1 - m.delta[r]) for r in gen_relays[g]) - len(gen_relays[g]) + 1 <= m.v[g]
+
+def declare_physical_load_compromised(model, index_set):
+
+    m = model
+    con_set = decl.declare_set("_con_physical_load_compromised", model=model, index_set=index_set)
+
+    m.physical_load_compromised = pe.Constraint(con_set)
+    m.physical_load_compromised_by_bus = pe.Constraint(con_set)
+    
+    for l in con_set:
+        m.physical_load_compromised[l] = m.u[l] <= 1 - m.delta_bus[l]
+
+def declare_physical_load_uncompromised(model, index_set):
+    
+    m = model
+    con_set = decl.declare_set("_con_physical_load_uncompromised", model=model, index_set=index_set)
+
+    m.physical_load_uncompromised = pe.Constraint(con_set)
+
+    for l in con_set:
+        m.physical_load_uncompromised[l] = m.u[l] >= 1 - m.delta_bus[l]
+
+def declare_physical_gen_uncompromised(model, index_set):
+    
+    m = model
+    con_set = decl.declare_set("_con_physical_gen_compromised", model=model, index_set=index_set)
+
+    m.physical_gen_compromised = pe.Constraint(con_set)
+
+    for g in con_set:
+        m.physical_gen_compromised[g] = m.v[g] <= 1 - m.delta_gen[g]
+
+def declare_physical_gen_compromised(model, index_set):
+
+    m = model
+    con_set = decl.declare_set("_con_physical_gen_uncompromised", model=model, index_set=index_set)
+
+    m.physical_gen_uncompromised = pe.Constraint(con_set)
+
+    for g in con_set:
+        m.physical_gen_uncompromised[g] = m.v[g] >= 1 - m.delta_gen[g]
+
+def declare_physical_line_compromised(model, index_set):
+
+    m = model
+    con_set = decl.declare_set("_con_physical_line_compromised", model=model, index_set=index_set)
+
+    m.physical_line_compromised = pe.Constraint(con_set)
+
+    for k in con_set:
+        m.physical_line_compromised[k] = m.w[k] <= 1 - m.delta_branch[k]
+
+def declare_physical_line_uncompromised(model, index_set):
+
+    m = model
+    con_set = decl.declare_set("_con_physical_line_uncompromised", model=model, index_set=index_set)
+
+    m.physical_line_uncompromised = pe.Constraint(con_set)
+
+    for k in con_set:
+        m.physical_line_uncompromised[k] = m.w[k] >= 1 - m.delta_branch[k]

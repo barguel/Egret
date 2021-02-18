@@ -1,0 +1,44 @@
+\ENCODING=ISO-8859-1
+\Problem name: C:\Users\barguel\AppData\Local\Temp\tmpopctchwr.pyomo.lp_conflict
+
+Minimize
+ obj:
+Subject To
+ c_e_subproblem_eq_pf_branch_ub(27)_: subproblem_pf(27)  = 0
+ c_e_subproblem_eq_pf_branch_ub(28)_: subproblem_pf(28)  = 0
+ c_e_subproblem_eq_pf_branch_ub(30)_: subproblem_pf(30)  = 0
+ c_u_subproblem_ineq_load_shed_lb(118)_: - load_shed(118) <= -3.33
+ c_u_subproblem_ineq_gen_lb(22)_: - subproblem_pg(22) <= -1
+ c_u_subproblem_ineq_gen_lb(23)_: - subproblem_pg(23) <= -1
+ c_u_subproblem_ineq_gen_lb(24)_: - subproblem_pg(24) <= -0.1
+ c_e_subproblem_eq_p_balance(117)_: subproblem_pf(30) - subproblem_pf(32)
+                                 - subproblem_pf(33)  = 0
+ c_e_subproblem_eq_p_balance(118)_: load_shed(118) + subproblem_pf(32)
+                                 - subproblem_pf(34) - subproblem_pf(35)
+                                 + subproblem_pg(22)  = 3.33
+ c_e_subproblem_eq_p_balance(121)_: subproblem_pf(27) + subproblem_pf(28)
+                                 + subproblem_pf(34) + subproblem_pf(35)
+                                 - subproblem_pf(40) + subproblem_pg(23)  = 0
+ c_e_subproblem_eq_p_balance(122)_: subproblem_pf(33) + subproblem_pf(40)
+                                 + subproblem_pg(24) + subproblem_pg(25)
+                                 + subproblem_pg(26) + subproblem_pg(27)
+                                 + subproblem_pg(28) + subproblem_pg(29)  = 0
+\Sum of equality rows in the conflict:
+\ sum_eq: load_shed(118) + 2 subproblem_pf(27) + 2 subproblem_pf(28)
+\         + 2 subproblem_pf(30) + subproblem_pg(22) + subproblem_pg(23)
+\         + subproblem_pg(24) + subproblem_pg(25) + subproblem_pg(26)
+\         + subproblem_pg(27) + subproblem_pg(28) + subproblem_pg(29)  = 3.33
+Bounds
+      load_shed(118) Free
+      subproblem_pf(27) Free
+      subproblem_pf(28) Free
+      subproblem_pf(30) Free
+      subproblem_pf(32) Free
+      subproblem_pf(33) Free
+      subproblem_pf(34) Free
+      subproblem_pf(35) Free
+      subproblem_pf(40) Free
+      subproblem_pg(22) Free
+      subproblem_pg(23) Free
+      subproblem_pg(24) Free
+End

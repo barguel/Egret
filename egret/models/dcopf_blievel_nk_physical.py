@@ -25,6 +25,7 @@ import egret.model_library.extensions.subproblem_bilevel_nk as subcons
 import egret.model_library.decl as decl
 from egret.model_library.defn import CoordinateType, ApproximationType
 from math import pi, radians
+import pdb
 
 
 def _create_bigm(model, md):
@@ -49,7 +50,7 @@ def _create_bigm(model, md):
         model.BIGM[branch_name] = b * (2*pi + shift) + 1000.
 
 
-def create_master(model_data, k=1):
+def create_master(model_data, k=4):
     """
     Create the upper-level (master) of the bilevel problem
 
@@ -83,22 +84,22 @@ def create_master(model_data, k=1):
     buses_with_loads = list(k for k in bus_p_loads.keys() if bus_p_loads[k] != 0.)
     ### upper-level (attacker) variables
     decl.declare_var('load_shed', model, buses_with_loads, initialize=0.0, domain=pe.NonNegativeReals)
-    decl.declare_var('delta_k', model, branch_attrs['names'], domain=pe.Binary) # line compromised
-    decl.declare_var('delta_g', model, gen_attrs['names'], domain=pe.Binary) # gen compromised
-    decl.declare_var('delta_b', model, bus_attrs['names'], domain=pe.Binary) # bus compromised
+    decl.declare_var('delta_bus', model, bus_attrs['names'], domain=pe.Binary) # bus attacked
+    decl.declare_var('delta_load', model, buses_with_loads, domain=pe.Binary) # load attacked
+    decl.declare_var('delta_gen', model, gen_attrs['names'], domain=pe.Binary) # generator attacked
+    decl.declare_var('delta_branch', model, branch_attrs['names'], domain=pe.Binary) # line attacked
     decl.declare_var('u', model, buses_with_loads, domain=pe.Binary) # load available
     decl.declare_var('v', model, gen_attrs['names'], domain=pe.Binary) # generator available
     decl.declare_var('w', model, branch_attrs['names'], domain=pe.Binary) # line available
 
     ### upper-level constraints
-    cons.declare_component_budget(model, k, branch_attrs['name'],\
-        gen_attrs['name'], bus_attrs['names']) # note that all k are costed equally in current implementation
-    cons.declare_load_compromised(model, relay_load_tuple)
-    cons.declare_load_uncompromised(model, buses_with_loads, load_relays)
-    cons.declare_branch_compromised(model, relay_branch_tuple)
-    cons.declare_branch_uncompromised(model, branch_attrs['names'], branch_relays)
-    cons.declare_gen_compromised(model, relay_gen_tuple)
-    cons.declare_gen_uncompromised(model, gen_attrs['names'], gen_relays)
+    cons.declare_physical_budget(model, k)
+    cons.declare_physical_load_compromised(model, buses_with_loads)
+    cons.declare_physical_load_uncompromised(model, buses_with_loads)
+    cons.declare_physical_line_compromised(model, branch_attrs['names'])
+    cons.declare_physical_line_uncompromised(model, branch_attrs['names'])
+    cons.declare_physical_gen_compromised(model, gen_attrs['names'])
+    cons.declare_physical_gen_uncompromised(model, gen_attrs['names'])
 
     ### upper-level objective for interdiction problem (opposite to lower-level objective)
     model.obj = pe.Objective(expr=sum(model.load_shed[l] for l in buses_with_loads), sense=pe.maximize)
@@ -116,6 +117,10 @@ def create_explicit_subproblem(model, model_data, include_angle_diff_limits=Fals
     branches = dict(md.elements(element_type='branch'))
     loads = dict(md.elements(element_type='load'))
     shunts = dict(md.elements(element_type='shunt'))
+
+    ### forcing generator lower bounds to be 0
+    for gen_id, gen in gens.items():
+        gen['p_min'] = 0
 
     ### create dictionaries across object attributes for an object of the same set type
     gen_attrs = md.attributes(element_type='generator')
@@ -155,6 +160,10 @@ def create_explicit_subproblem(model, model_data, include_angle_diff_limits=Fals
     ### declare the generator real power
     pg_init = {k: (gen_attrs['p_min'][k] + gen_attrs['p_max'][k]) / 2.0 for k in gen_attrs['pg']}
     libgen.declare_var_pg(model.subproblem, gen_attrs['names'], initialize=pg_init)
+
+    ### overriding the generator lower bounds
+    for gen in model.subproblem.pg.index_set():
+        model.subproblem.pg[gen].setlb(0)
 
     ### declare the current flows in the branches
     vr_init = {k: bus_attrs['vm'][k] * pe.cos(bus_attrs['va'][k]) for k in bus_attrs['vm']}
@@ -251,6 +260,11 @@ def solve_bilevel_physical_nk(model_data,
                 solver_tee = True,
                 return_model = False,
                 return_results = False,
+                return_power_flow = False,
+                allow_gens = True,
+                allow_bus = True,
+                allow_load = True,
+                allow_branch = True,
                 **kwargs):
     '''
     Create and solve a new worst-case attacker defender
@@ -287,6 +301,10 @@ def solve_bilevel_physical_nk(model_data,
     ### create lower-level of the bilevel problem
     m, md = create_explicit_subproblem(m, md,include_bigm=False)
 
+    #### disable components that should not be attacked
+    if not allow_load:
+        m.delta_bus.fix(0)
+
     ### use PAO (Pyomo-extension) to do the following:
     ### 1. Transform the lower-level primal problem into it's corresponding dual problem
     ### 2. Apply Pyomo.GDP transformations to handle bilinear terms (Big-M)
@@ -296,10 +314,10 @@ def solve_bilevel_physical_nk(model_data,
     opt = pe.SolverFactory('pao.bilevel.ld', solver=solver)
     ## need to fine-tune bigM and mipgap -- make sure that both the solve and resolve result in the same
     ## best objective
-    opt.options.setdefault('bigM', 100)
+    opt.options.setdefault('bigM', 2)
     opt.options.setdefault('mipgap', 0.001)
     results = opt.solve(m, tee=solver_tee)
-
+    
     ### save results data to ModelData object
     gens = dict(md.elements(element_type='generator'))
     buses = dict(md.elements(element_type='bus'))
@@ -307,27 +325,36 @@ def solve_bilevel_physical_nk(model_data,
 
     md.data['system']['total_cost'] = value(m.obj)
 
-    m = m.subproblem
+    power_flow = m.subproblem
     for g,g_dict in gens.items():
-        g_dict['pg'] = value(m.pg[g])
+        g_dict['pg'] = value(power_flow.pg[g])
 
     for k, k_dict in branches.items():
-        k_dict['pf'] = value(m.pf[k])
+        k_dict['pf'] = value(power_flow.pf[k])
 
     for b,b_dict in buses.items():
-        b_dict['pl'] = value(m.pl[b])
-        b_dict['va'] = value(m.va[b])
+        b_dict['pl'] = value(power_flow.pl[b])
+        b_dict['va'] = value(power_flow.va[b])
 
     unscale_ModelData_to_pu(md, inplace=True)
 
     ### return model_data (md), model (m), and/or results (results) objects
-    if return_model and return_results:
+    return_item = [md]
+    if return_model:
+        return_item.append(m)
+    if return_power_flow:
+        return_item.append(power_flow)
+    if return_results:
+        return_item.append(results)
+    return tuple(return_item)
+
+    '''if return_model and return_results:
         return md, m, results
     elif return_model:
         return md, m
     elif return_results:
         return md, results
-    return md
+    return md'''
 
 
 if __name__ == '__main__':
@@ -345,5 +372,5 @@ if __name__ == '__main__':
 
     ### solve the bilevel interdiction problem
     md_serialization, results = solve_bilevel_physical_nk(md_dict, "gurobi", solver_tee=True,
-                                            return_results=True, **kwargs)
+                                            return_results=True, attack_budget_k = 5, symbolic_solver_labels = True)
 
